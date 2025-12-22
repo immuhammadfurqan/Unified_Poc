@@ -1,5 +1,9 @@
 from typing import List
+import logging
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Unified POC Backend"
@@ -10,6 +14,12 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./sql_app.db"
+
+    # Frontend URL for OAuth redirects
+    FRONTEND_URL: str = "http://localhost:8000"
+
+    # AI Provider
+    OPENAI_API_KEY: str = ""
 
     # Integrations
     GITHUB_CLIENT_ID: str = ""
@@ -26,5 +36,15 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
+
 settings = Settings()
+
+# Log configuration on startup
+logger.info("=" * 50)
+logger.info("Configuration loaded:")
+logger.info(f"GITHUB_CLIENT_ID: {settings.GITHUB_CLIENT_ID[:10] + '...' if settings.GITHUB_CLIENT_ID else 'NOT SET'}")
+logger.info(f"GITHUB_CLIENT_SECRET: {'SET' if settings.GITHUB_CLIENT_SECRET else 'NOT SET'}")
+logger.info(f"OPENAI_API_KEY: {'SET' if settings.OPENAI_API_KEY else 'NOT SET'}")
+logger.info(f"FRONTEND_URL: {settings.FRONTEND_URL}")
+logger.info("=" * 50)
 
