@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified POC</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Axios -->
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const API_URL = "http://localhost:8000/api/v1";
+
+        function App() {
+            const [token, setToken] = React.useState(localStorage.getItem('token'));
+            const [user, setUser] = React.useState(null);
+
+            const logout = () => {
+                setToken(null);
+                localStorage.removeItem('token');
+                setUser(null);
+            };
+
+            if (!token) {
+                return <Login setToken={setToken} />;
+            }
+
+            return (
+                <div className="container mx-auto p-4">
+                    <div className="flex justify-between items-center mb-6">
+                        <h1 className="text-2xl font-bold text-gray-800">Unified POC Dashboard</h1>
+                        <button onClick={logout} className="text-red-500 hover:text-red-700">Logout</button>
+                    </div>
+                    <Dashboard token={token} />
+                </div>
+            );
+        }
+
+        function Login({ setToken }) {
+            const [isRegister, setIsRegister] = React.useState(false);
+            const [email, setEmail] = React.useState("");
+            const [password, setPassword] = React.useState("");
+            const [error, setError] = React.useState("");
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError("");
+                try {
+                    const endpoint = isRegister ? "/auth/register" : "/auth/login";
+                    const res = await axios.post(`${API_URL}${endpoint}`, { email, password });
+                    const token = res.data.access_token;
+                    localStorage.setItem('token', token);
+                    setToken(token);
+                } catch (err) {
+                    setError(err.response?.data?.detail || "An error occurred");
+                }
+            };
+
+            return (
+                <div className="flex justify-center items-center h-screen">
+                    <div className="bg-white p-8 rounded shadow-md w-96">
+                        <h2 className="text-2xl mb-4 font-bold">{isRegister ? "Register" : "Login"}</h2>
+                        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium">Email</label>
+                                <input className="w-full border p-2 rounded" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium">Password</label>
+                                <input className="w-full border p-2 rounded" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+                            </div>
+                            <button className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700" type="submit">
+                                {isRegister ? "Register" : "Login"}
+                            </button>
+                        </form>
+                        <button onClick={() => setIsRegister(!isRegister)} className="w-full mt-4 text-sm text-blue-500 hover:underline">
+                            {isRegister ? "Already have an account? Login" : "Need an account? Register"}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function Dashboard({ token }) {
+            const [activeTab, setActiveTab] = React.useState("github");
+
+            return (
+                <div className="bg-white rounded shadow p-6">
+                    <div className="flex space-x-4 border-b mb-6">
+                        {['github', 'figma', 'trello'].map(tab => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={`pb-2 capitalize ${activeTab === tab ? 'border-b-2 border-blue-500 font-bold' : 'text-gray-500'}`}
+                            >
+                                {tab}
+                            </button>
+                        ))}
+                    </div>
+                    {activeTab === 'github' && <GitHub token={token} />}
+                    {activeTab === 'figma' && <Figma token={token} />}
+                    {activeTab === 'trello' && <Trello token={token} />}
+                </div>
+            );
+        }
+
+        function GitHub({ token }) {
+            const [repos, setRepos] = React.useState([]);
+            const [repoName, setRepoName] = React.useState("");
+            const [msg, setMsg] = React.useState("");
+            
+            // Manual Token Input State
+            const [manualToken, setManualToken] = React.useState("");
+
+            const fetchRepos = async () => {
+                try {
+                    const res = await axios.get(`${API_URL}/integrations/github/repos`, { headers: { Authorization: `Bearer ${token}` } });
+                    setRepos(res.data);
+                } catch (err) {
+                    console.error(err);
+                    setMsg("Failed to fetch repos. Ensure you are connected.");
+                }
+            };
+            
+            const createRepo = async (e) => {
+                e.preventDefault();
+                try {
+                    await axios.post(`${API_URL}/integrations/github/repos`, { name: repoName }, { headers: { Authorization: `Bearer ${token}` } });
+                    setMsg("Repo created!");
+                    setRepoName("");
+                    fetchRepos();
+                } catch (err) {
+                    setMsg("Failed to create repo.");
+                }
+            }
+
+            const saveToken = async () => {
+                try {
+                    await axios.post(`${API_URL}/oauth/token`, { provider: "github", token: manualToken }, { headers: { Authorization: `Bearer ${token}` } });
+                    setMsg("Token saved!");
+                    setManualToken("");
+                } catch (err) { setMsg("Failed to save token"); }
+            }
+
+            return (
+                <div className="space-y-6">
+                    <div className="bg-gray-50 p-4 rounded border">
+                         <h3 className="font-bold mb-2">1. Connect GitHub</h3>
+                         <div className="flex gap-2">
+                            <input className="border p-1 rounded flex-1" placeholder="Paste GitHub Personal Access Token" value={manualToken} onChange={e => setManualToken(e.target.value)} />
+                            <button onClick={saveToken} className="bg-green-600 text-white px-3 py-1 rounded">Save Token</button>
+                         </div>
+                         <p className="text-xs text-gray-500 mt-1">Or use OAuth callback if configured.</p>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded border">
+                        <h3 className="font-bold mb-2">2. Create Repo</h3>
+                        <form onSubmit={createRepo} className="flex gap-2">
+                            <input className="border p-2 rounded flex-1" placeholder="Repository Name" value={repoName} onChange={e => setRepoName(e.target.value)} required />
+                            <button className="bg-blue-600 text-white px-4 py-2 rounded">Create</button>
+                        </form>
+                    </div>
+
+                    <div>
+                         <div className="flex justify-between items-center mb-2">
+                            <h3 className="font-bold">Your Repositories</h3>
+                            <button onClick={fetchRepos} className="text-sm text-blue-500 underline">Refresh</button>
+                         </div>
+                         {repos.length === 0 ? <p className="text-gray-500 italic">No repos fetched yet.</p> : (
+                             <ul className="list-disc pl-5">
+                                {repos.map(r => <li key={r.id}>{r.name} ({r.private ? 'Private' : 'Public'})</li>)}
+                             </ul>
+                         )}
+                    </div>
+                    {msg && <p className="text-blue-600">{msg}</p>}
+                </div>
+            );
+        }
+
+        function Figma({ token }) {
+            const [fileKey, setFileKey] = React.useState("");
+            const [data, setData] = React.useState(null);
+            const [manualToken, setManualToken] = React.useState("");
+            const [msg, setMsg] = React.useState("");
+
+            const analyze = async (e) => {
+                e.preventDefault();
+                try {
+                    const res = await axios.get(`${API_URL}/integrations/figma/analyze/${fileKey}`, { headers: { Authorization: `Bearer ${token}` } });
+                    setData(res.data);
+                    setMsg("");
+                } catch (err) {
+                    setMsg("Failed to analyze. Check token and file key.");
+                }
+            };
+
+            const saveToken = async () => {
+                try {
+                    await axios.post(`${API_URL}/oauth/token`, { provider: "figma", token: manualToken }, { headers: { Authorization: `Bearer ${token}` } });
+                    setMsg("Token saved!");
+                    setManualToken("");
+                } catch (err) { setMsg("Failed to save token"); }
+            }
+
+            return (
+                <div className="space-y-6">
+                    <div className="bg-gray-50 p-4 rounded border">
+                         <h3 className="font-bold mb-2">1. Connect Figma</h3>
+                         <div className="flex gap-2">
+                            <input className="border p-1 rounded flex-1" placeholder="Paste Figma Access Token" value={manualToken} onChange={e => setManualToken(e.target.value)} />
+                            <button onClick={saveToken} className="bg-green-600 text-white px-3 py-1 rounded">Save Token</button>
+                         </div>
+                    </div>
+
+                    <form onSubmit={analyze} className="flex gap-2">
+                        <input className="border p-2 rounded flex-1" placeholder="Figma File Key (from URL)" value={fileKey} onChange={e => setFileKey(e.target.value)} required />
+                        <button className="bg-purple-600 text-white px-4 py-2 rounded">Fetch Layers</button>
+                    </form>
+
+                    {data && (
+                        <div className="bg-gray-50 p-4 rounded border overflow-auto">
+                            <h4 className="font-bold">{data.file_name}</h4>
+                            <p className="text-sm text-gray-600 mb-2">{data.raw_data_summary}</p>
+                            <pre className="text-xs bg-gray-200 p-2 rounded">{JSON.stringify(data.frames, null, 2)}</pre>
+                        </div>
+                    )}
+                    {msg && <p className="text-red-500">{msg}</p>}
+                </div>
+            );
+        }
+
+        function Trello({ token }) {
+            const [boards, setBoards] = React.useState([]);
+            const [boardName, setBoardName] = React.useState("");
+            const [manualToken, setManualToken] = React.useState("");
+            const [msg, setMsg] = React.useState("");
+            
+            // New state for card creation
+            const [selectedBoard, setSelectedBoard] = React.useState(null);
+            const [lists, setLists] = React.useState([]);
+            const [cardName, setCardName] = React.useState("");
+            const [selectedListId, setSelectedListId] = React.useState("");
+
+            const saveToken = async () => {
+                try {
+                    await axios.post(`${API_URL}/oauth/token`, { provider: "trello", token: manualToken }, { headers: { Authorization: `Bearer ${token}` } });
+                    setMsg("Token saved!");
+                    setManualToken("");
+                } catch (err) { setMsg("Failed to save token"); }
+            }
+
+            const fetchBoards = async () => {
+                try {
+                    const res = await axios.get(`${API_URL}/integrations/trello/boards`, { headers: { Authorization: `Bearer ${token}` } });
+                    setBoards(res.data);
+                } catch (err) { setMsg("Failed to fetch boards"); }
+            };
+
+            const fetchLists = async (boardId) => {
+                try {
+                    const res = await axios.get(`${API_URL}/integrations/trello/boards/${boardId}/lists`, { headers: { Authorization: `Bearer ${token}` } });
+                    setLists(res.data);
+                    setSelectedBoard(boardId);
+                    if (res.data.length > 0) setSelectedListId(res.data[0].id);
+                } catch (err) { setMsg("Failed to fetch lists"); }
+            };
+
+            const createBoard = async (e) => {
+                e.preventDefault();
+                try {
+                    await axios.post(`${API_URL}/integrations/trello/boards`, { name: boardName }, { headers: { Authorization: `Bearer ${token}` } });
+                    setMsg("Board created!");
+                    setBoardName("");
+                    fetchBoards();
+                } catch (err) { setMsg("Failed to create board"); }
+            };
+
+            const createCard = async (e) => {
+                e.preventDefault();
+                try {
+                    await axios.post(`${API_URL}/integrations/trello/cards`, 
+                        { list_id: selectedListId, name: cardName }, 
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                    setMsg("Card created!");
+                    setCardName("");
+                } catch (err) { setMsg("Failed to create card"); }
+            };
+
+            return (
+                <div className="space-y-6">
+                     <div className="bg-gray-50 p-4 rounded border">
+                         <h3 className="font-bold mb-2">1. Connect Trello</h3>
+                         <div className="flex gap-2">
+                            <input className="border p-1 rounded flex-1" placeholder="Paste Trello Token" value={manualToken} onChange={e => setManualToken(e.target.value)} />
+                            <button onClick={saveToken} className="bg-green-600 text-white px-3 py-1 rounded">Save Token</button>
+                         </div>
+                         <p className="text-xs text-gray-500 mt-1">Get token from Trello Developer Sandbox</p>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded border">
+                        <h3 className="font-bold mb-2">2. Create Board</h3>
+                        <form onSubmit={createBoard} className="flex gap-2">
+                            <input className="border p-2 rounded flex-1" placeholder="New Board Name" value={boardName} onChange={e => setBoardName(e.target.value)} required />
+                            <button className="bg-blue-500 text-white px-4 py-2 rounded">Create Board</button>
+                        </form>
+                    </div>
+
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <h3 className="font-bold">Your Boards</h3>
+                            <button onClick={fetchBoards} className="text-sm text-blue-500 underline">Refresh Boards</button>
+                        </div>
+                        <ul className="space-y-2">
+                            {boards.map(b => (
+                                <li key={b.id} className="flex justify-between items-center bg-white p-2 border rounded">
+                                    <span>{b.name}</span>
+                                    <button onClick={() => fetchLists(b.id)} className="bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded text-sm">
+                                        Select / Get Lists
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    {selectedBoard && (
+                        <div className="bg-gray-50 p-4 rounded border border-blue-200">
+                             <h3 className="font-bold mb-2">3. Create Card</h3>
+                             {lists.length === 0 ? <p>No lists found on this board.</p> : (
+                                 <form onSubmit={createCard} className="space-y-2">
+                                     <div>
+                                         <label className="text-xs font-bold block">Select List</label>
+                                         <select className="w-full border p-2 rounded" value={selectedListId} onChange={e => setSelectedListId(e.target.value)}>
+                                             {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                         </select>
+                                     </div>
+                                     <div>
+                                         <label className="text-xs font-bold block">Card Name</label>
+                                         <input className="w-full border p-2 rounded" placeholder="New Card Title" value={cardName} onChange={e => setCardName(e.target.value)} required />
+                                     </div>
+                                     <button className="bg-green-600 text-white px-4 py-2 rounded w-full">Create Card</button>
+                                 </form>
+                             )}
+                        </div>
+                    )}
+
+                    {msg && <p className="text-blue-600 font-bold">{msg}</p>}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+

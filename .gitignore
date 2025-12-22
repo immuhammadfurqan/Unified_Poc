@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# Environment variables
+.env
+.env.*
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Distribution / Packaging
+dist/
+build/
+*.egg-info/
+
+# IDE settings
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local debug scripts (optional, uncomment if these are temporary)
+debug_figma.py
+debug_trello.py
+
