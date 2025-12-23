@@ -6,7 +6,7 @@ Handles:
 2. Resource management (repos, issues, etc.)
 """
 
-from typing import Annotated, List, Dict, Any
+from typing import Annotated
 from urllib.parse import urlencode
 import secrets
 import logging
@@ -15,7 +15,6 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.core.deps import get_current_user
@@ -23,46 +22,19 @@ from app.users.models import User
 from app.integrations.repository import IntegrationRepository
 from app.integrations.service import OAuthService
 from app.github_integration.service import GitHubService
-from app.github_integration.client import GitHubClient
 from app.core.config import settings
+from app.github_integration.schemas import (
+    GitHubConnectResponse, GitHubStatusResponse, GitHubDisconnectResponse,
+    GitHubCallbackRequest, RepoCreate
+)
+from app.github_integration.dependencies import get_oauth_service, get_github_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# --- OAuth & Status Models ---
-
 # In-memory state storage (use Redis in production)
 _oauth_states: dict[str, int] = {}
-
-class GitHubConnectResponse(BaseModel):
-    authorization_url: str
-
-class GitHubStatusResponse(BaseModel):
-    connected: bool
-    username: str | None = None
-    error: str | None = None
-
-class GitHubDisconnectResponse(BaseModel):
-    message: str
-
-class GitHubCallbackRequest(BaseModel):
-    code: str
-    state: str
-
-# --- Resource Models ---
-
-class RepoCreate(BaseModel):
-    name: str
-    private: bool = False
-
-# --- Dependencies ---
-
-def get_oauth_service(db: AsyncSession = Depends(get_db)) -> OAuthService:
-    return OAuthService(IntegrationRepository(db))
-
-def get_github_service(oauth_service: OAuthService = Depends(get_oauth_service)) -> GitHubService:
-    return GitHubService(oauth_service, GitHubClient())
 
 # --- OAuth Endpoints ---
 
@@ -207,4 +179,3 @@ async def list_github_repos(
     service: GitHubService = Depends(get_github_service)
 ):
     return await service.list_repos(user.id)
-

@@ -1,3 +1,4 @@
+import uvicorn
 from fastapi import FastAPI, APIRouter
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,21 +20,25 @@ app = FastAPI(title=settings.PROJECT_NAME)
 if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"], # Allow all for local dev ease, or keep specific list
+        allow_origins=["*"],  # Allow all for local dev ease, or keep specific list
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
 
 @app.on_event("startup")
 async def startup_event():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+
 # Construct API Router
 api_router = APIRouter()
 api_router.include_router(users_router, prefix="/auth", tags=["auth"])
-api_router.include_router(integrations_router, prefix="/integrations", tags=["integrations"])
+api_router.include_router(
+    integrations_router, prefix="/integrations", tags=["integrations"]
+)
 api_router.include_router(github_router, prefix="/github", tags=["github"])
 api_router.include_router(trello_router, prefix="/trello", tags=["trello"])
 api_router.include_router(figma_router, prefix="/figma", tags=["figma"])
@@ -44,6 +49,11 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 # Mount static files
 app.mount("/ui", StaticFiles(directory="frontend/static", html=True), name="static")
 
+
 @app.get("/")
 async def root():
     return {"message": "Go to /ui to view the dashboard"}
+
+
+if __name__ == "__main__":
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True, reload_dirs=["app"])
