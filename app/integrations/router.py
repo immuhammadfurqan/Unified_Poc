@@ -2,10 +2,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
-from app.api.deps import get_current_user
-from app.models.user import User
-from app.repositories.integration_repository import IntegrationRepository
-from app.services.oauth_service import OAuthService
+from app.core.deps import get_current_user
+from app.users.models import User
+from app.integrations.repository import IntegrationRepository
+from app.integrations.service import OAuthService
 from app.core.config import settings
 import httpx
 from pydantic import BaseModel
@@ -82,3 +82,4 @@ async def oauth_callback(
         
     await oauth_service.save_token(user.id, provider, token)
     return {"message": f"Successfully connected to {provider}"}
+

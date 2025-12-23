@@ -2,10 +2,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
-from app.schemas.user import UserCreate, UserLogin
-from app.schemas.token import Token
-from app.services.auth_service import AuthService
-from app.repositories.user_repository import UserRepository
+from app.users.schemas import UserCreate, UserLogin, Token
+from app.users.service import AuthService
+from app.users.repository import UserRepository
 
 router = APIRouter()
 

@@ -46,3 +46,4 @@ class TrelloClient:
             response = await client.get(f"{self.BASE_URL}/boards/{board_id}/lists", params=params)
             response.raise_for_status()
             return response.json()
+

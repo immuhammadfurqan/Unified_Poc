@@ -12,5 +12,5 @@ class Integration(Base):
     expires_at = Column(DateTime, nullable=True)
     provider_metadata = Column(JSON, nullable=True)  # Provider-specific data e.g., {"github_username": "user123"}
     
-    user = relationship("User", backref="integrations")
+    user = relationship("app.users.models.User", backref="integrations")
 

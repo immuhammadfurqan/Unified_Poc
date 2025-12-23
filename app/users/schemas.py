@@ -1,6 +1,15 @@
 from typing import Optional
 from pydantic import BaseModel, EmailStr
 
+# Token Schemas
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenPayload(BaseModel):
+    sub: Optional[int] = None
+
+# User Schemas
 class UserBase(BaseModel):
     email: EmailStr
     is_active: Optional[bool] = True

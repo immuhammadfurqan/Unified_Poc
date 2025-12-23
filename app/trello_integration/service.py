@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
-from app.clients.trello_client import TrelloClient
-from app.services.oauth_service import OAuthService
+from app.trello_integration.client import TrelloClient
+from app.integrations.service import OAuthService
 
 class TrelloService:
     def __init__(self, oauth_service: OAuthService, client: TrelloClient):

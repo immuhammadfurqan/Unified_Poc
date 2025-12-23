@@ -1,6 +1,6 @@
 from typing import Any, Dict
-from app.clients.figma_client import FigmaClient
-from app.services.oauth_service import OAuthService
+from app.figma_integration.client import FigmaClient
+from app.integrations.service import OAuthService
 
 class FigmaService:
     def __init__(self, oauth_service: OAuthService, client: FigmaClient):

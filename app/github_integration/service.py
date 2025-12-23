@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
-from app.clients.github_client import GitHubClient
-from app.services.oauth_service import OAuthService
+from app.github_integration.client import GitHubClient
+from app.integrations.service import OAuthService
 
 class GitHubService:
     def __init__(self, oauth_service: OAuthService, client: GitHubClient):

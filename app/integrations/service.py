@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Dict, Any, Optional
-from app.repositories.integration_repository import IntegrationRepository
-from app.models.integration import Integration
+from app.integrations.repository import IntegrationRepository
+from app.integrations.models import Integration
 
 
 class OAuthService:

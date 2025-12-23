@@ -10,7 +10,7 @@ import json
 
 from openai import AsyncOpenAI
 
-from app.services.github_service import GitHubService
+from app.github_integration.service import GitHubService
 from app.core.config import settings
 
 
@@ -291,3 +291,4 @@ Be concise but informative in your responses. If an operation fails, explain wha
             return {"error": str(e)}
         except Exception as e:
             return {"error": f"Tool execution failed: {str(e)}"}
+

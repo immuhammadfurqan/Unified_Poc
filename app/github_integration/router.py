@@ -1,80 +1,84 @@
 """
-GitHub OAuth Router
+GitHub Integration Router
 
-Handles GitHub OAuth flow with proper state validation for CSRF protection.
-Endpoints:
-- GET /connect: Returns GitHub authorization URL
-- GET /callback: Handles OAuth callback, exchanges code for token
-- GET /status: Returns connection status and username
-- DELETE /disconnect: Removes GitHub integration
+Handles:
+1. OAuth flow (connect, callback, status, disconnect)
+2. Resource management (repos, issues, etc.)
 """
 
-from typing import Annotated
+from typing import Annotated, List, Dict, Any
 from urllib.parse import urlencode
 import secrets
 import logging
+import httpx
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
-import httpx
 
 from app.db.session import get_db
-from app.api.deps import get_current_user
-from app.models.user import User
-from app.repositories.integration_repository import IntegrationRepository
-from app.services.oauth_service import OAuthService
+from app.core.deps import get_current_user
+from app.users.models import User
+from app.integrations.repository import IntegrationRepository
+from app.integrations.service import OAuthService
+from app.github_integration.service import GitHubService
+from app.github_integration.client import GitHubClient
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-
 router = APIRouter()
 
-# In-memory state storage (use Redis in production for distributed systems)
-_oauth_states: dict[str, int] = {}
+# --- OAuth & Status Models ---
 
+# In-memory state storage (use Redis in production)
+_oauth_states: dict[str, int] = {}
 
 class GitHubConnectResponse(BaseModel):
     authorization_url: str
-
 
 class GitHubStatusResponse(BaseModel):
     connected: bool
     username: str | None = None
     error: str | None = None
 
-
 class GitHubDisconnectResponse(BaseModel):
     message: str
 
+class GitHubCallbackRequest(BaseModel):
+    code: str
+    state: str
 
-def _get_oauth_service(db: AsyncSession = Depends(get_db)) -> OAuthService:
+# --- Resource Models ---
+
+class RepoCreate(BaseModel):
+    name: str
+    private: bool = False
+
+# --- Dependencies ---
+
+def get_oauth_service(db: AsyncSession = Depends(get_db)) -> OAuthService:
     return OAuthService(IntegrationRepository(db))
 
+def get_github_service(oauth_service: OAuthService = Depends(get_oauth_service)) -> GitHubService:
+    return GitHubService(oauth_service, GitHubClient())
+
+# --- OAuth Endpoints ---
 
 @router.get("/connect", response_model=GitHubConnectResponse)
 async def connect_github(
     user: Annotated[User, Depends(get_current_user)],
 ) -> GitHubConnectResponse:
-    """
-    Initiates GitHub OAuth flow.
-    Returns the GitHub authorization URL for the user to redirect to.
-    """
+    """Initiates GitHub OAuth flow."""
     logger.info(f"GitHub OAuth connect called for user {user.id}")
-    logger.info(f"GITHUB_CLIENT_ID value: '{settings.GITHUB_CLIENT_ID}'")
-    logger.info(f"GITHUB_CLIENT_ID type: {type(settings.GITHUB_CLIENT_ID)}")
-    logger.info(f"GITHUB_CLIENT_ID bool check: {bool(settings.GITHUB_CLIENT_ID)}")
     
     if not settings.GITHUB_CLIENT_ID:
-        logger.error("GITHUB_CLIENT_ID is empty or None!")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="GitHub OAuth not configured. Set GITHUB_CLIENT_ID in environment."
         )
     
-    # Generate state token for CSRF protection
     state = secrets.token_urlsafe(32)
     _oauth_states[state] = user.id
     
@@ -88,30 +92,18 @@ async def connect_github(
     authorization_url = f"https://github.com/login/oauth/authorize?{urlencode(params)}"
     return GitHubConnectResponse(authorization_url=authorization_url)
 
-
-class GitHubCallbackRequest(BaseModel):
-    code: str
-    state: str
-
-
 @router.post("/callback")
 async def github_callback(
     request: GitHubCallbackRequest,
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ) -> dict:
-    """
-    GitHub OAuth callback endpoint (POST).
-    Exchanges the authorization code for an access token and stores it.
-    Authenticated endpoint - uses Bearer token from frontend.
-    """
+    """Exchanges authorization code for access token."""
     code = request.code
     state = request.state
     
-    # Verify state matches the one stored for this user
     stored_user_id = _oauth_states.pop(state, None)
     if stored_user_id != user.id:
-        # If state not found or user ID mismatch (though state is random, so mismatch implies interception)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired state parameter"
@@ -120,13 +112,12 @@ async def github_callback(
     if not settings.GITHUB_CLIENT_SECRET:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="GitHub OAuth not configured. Set GITHUB_CLIENT_SECRET in environment."
+            detail="GitHub OAuth not configured."
         )
     
     oauth_service = OAuthService(IntegrationRepository(db))
     
     async with httpx.AsyncClient() as client:
-        # Exchange code for access token
         token_response = await client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
@@ -139,22 +130,15 @@ async def github_callback(
         )
         
         if token_response.status_code != 200:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to exchange code for token"
-            )
+            raise HTTPException(status_code=400, detail="Failed to exchange code")
         
         token_data = token_response.json()
         access_token = token_data.get("access_token")
         
         if not access_token:
-            error = token_data.get("error_description", "No access token received")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=error
-            )
+            raise HTTPException(status_code=400, detail=token_data.get("error_description", "No token"))
         
-        # Fetch GitHub user info to verify token and get username
+        # Fetch user info
         user_response = await client.get(
             "https://api.github.com/user",
             headers={
@@ -164,15 +148,11 @@ async def github_callback(
         )
         
         if user_response.status_code != 200:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to verify GitHub token"
-            )
+            raise HTTPException(status_code=400, detail="Failed to verify GitHub token")
         
         github_user = user_response.json()
         github_username = github_user.get("login")
         
-        # Save token with metadata
         await oauth_service.save_token(
             user_id=user.id,
             provider="github",
@@ -182,35 +162,18 @@ async def github_callback(
     
     return {"message": "GitHub connected successfully", "username": github_username}
 
-
 @router.get("/status", response_model=GitHubStatusResponse)
 async def github_status(
     user: Annotated[User, Depends(get_current_user)],
-    oauth_service: Annotated[OAuthService, Depends(_get_oauth_service)]
+    oauth_service: Annotated[OAuthService, Depends(get_oauth_service)]
 ) -> GitHubStatusResponse:
-    """
-    Check if user has connected their GitHub account.
-    Optionally verifies the token is still valid.
-    """
+    """Check connection status."""
     integration = await oauth_service.get_integration(user.id, "github")
     
     if not integration:
         return GitHubStatusResponse(connected=False)
     
-    # Verify token is still valid
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            "https://api.github.com/user",
-            headers={
-                "Authorization": f"Bearer {integration.access_token}",
-                "Accept": "application/vnd.github.v3+json"
-            }
-        )
-        
-        if response.status_code == 401:
-            # Token expired or revoked - clean up
-            await oauth_service.delete_integration(user.id, "github")
-            return GitHubStatusResponse(connected=False, error="Token expired or revoked")
+    # Optional: Verify token validity here if needed
     
     username = None
     if integration.provider_metadata:
@@ -218,22 +181,30 @@ async def github_status(
     
     return GitHubStatusResponse(connected=True, username=username)
 
-
 @router.delete("/disconnect", response_model=GitHubDisconnectResponse)
 async def disconnect_github(
     user: Annotated[User, Depends(get_current_user)],
-    oauth_service: Annotated[OAuthService, Depends(_get_oauth_service)]
+    oauth_service: Annotated[OAuthService, Depends(get_oauth_service)]
 ) -> GitHubDisconnectResponse:
-    """
-    Disconnect GitHub integration for the current user.
-    """
     deleted = await oauth_service.delete_integration(user.id, "github")
-    
     if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="GitHub integration not found"
-        )
-    
+        raise HTTPException(status_code=404, detail="GitHub integration not found")
     return GitHubDisconnectResponse(message="GitHub disconnected successfully")
+
+# --- Resource Endpoints ---
+
+@router.post("/repos")
+async def create_github_repo(
+    repo: RepoCreate,
+    user: User = Depends(get_current_user),
+    service: GitHubService = Depends(get_github_service)
+):
+    return await service.create_repo(user.id, repo.name, repo.private)
+
+@router.get("/repos")
+async def list_github_repos(
+    user: User = Depends(get_current_user),
+    service: GitHubService = Depends(get_github_service)
+):
+    return await service.list_repos(user.id)
 

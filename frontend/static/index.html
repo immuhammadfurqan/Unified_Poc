@@ -195,7 +195,7 @@
             const handleGitHubCallback = async (code, state) => {
                 setMsg("Finishing GitHub connection...");
                 try {
-                    await axios.post(`${API_URL}/oauth/github/callback`, 
+                    await axios.post(`${API_URL}/github/callback`, 
                         { code, state },
                         { headers: { Authorization: `Bearer ${token}` } }
                     );
@@ -210,7 +210,7 @@
 
             const checkConnectionStatus = async () => {
                 try {
-                    const res = await axios.get(`${API_URL}/oauth/github/status`, { headers: { Authorization: `Bearer ${token}` } });
+                    const res = await axios.get(`${API_URL}/github/status`, { headers: { Authorization: `Bearer ${token}` } });
                     setConnectionStatus({ ...res.data, loading: false });
                     if (res.data.connected) {
                         fetchRepos();
@@ -223,7 +223,7 @@
 
             const connectGitHub = async () => {
                 try {
-                    const res = await axios.get(`${API_URL}/oauth/github/connect`, { headers: { Authorization: `Bearer ${token}` } });
+                    const res = await axios.get(`${API_URL}/github/connect`, { headers: { Authorization: `Bearer ${token}` } });
                     // Redirect to GitHub OAuth page
                     window.location.href = res.data.authorization_url;
                 } catch (err) {
@@ -233,7 +233,7 @@
 
             const disconnectGitHub = async () => {
                 try {
-                    await axios.delete(`${API_URL}/oauth/github/disconnect`, { headers: { Authorization: `Bearer ${token}` } });
+                    await axios.delete(`${API_URL}/github/disconnect`, { headers: { Authorization: `Bearer ${token}` } });
                     setConnectionStatus({ connected: false, username: null, loading: false });
                     setRepos([]);
                     setMsg("GitHub disconnected successfully");
@@ -244,7 +244,7 @@
 
             const fetchRepos = async () => {
                 try {
-                    const res = await axios.get(`${API_URL}/integrations/github/repos`, { headers: { Authorization: `Bearer ${token}` } });
+                    const res = await axios.get(`${API_URL}/github/repos`, { headers: { Authorization: `Bearer ${token}` } });
                     setRepos(res.data);
                     setMsg("");
                 } catch (err) {
@@ -256,7 +256,7 @@
             const createRepo = async (e) => {
                 e.preventDefault();
                 try {
-                    await axios.post(`${API_URL}/integrations/github/repos`, { name: repoName, private: isPrivate }, { headers: { Authorization: `Bearer ${token}` } });
+                    await axios.post(`${API_URL}/github/repos`, { name: repoName, private: isPrivate }, { headers: { Authorization: `Bearer ${token}` } });
                     setMsg("Repository created successfully!");
                     setRepoName("");
                     setIsPrivate(false);
@@ -390,7 +390,7 @@
             const analyze = async (e) => {
                 e.preventDefault();
                 try {
-                    const res = await axios.get(`${API_URL}/integrations/figma/analyze/${fileKey}`, { headers: { Authorization: `Bearer ${token}` } });
+                    const res = await axios.get(`${API_URL}/figma/analyze/${fileKey}`, { headers: { Authorization: `Bearer ${token}` } });
                     setData(res.data);
                     setMsg("");
                 } catch (err) {
@@ -400,7 +400,7 @@
 
             const saveToken = async () => {
                 try {
-                    await axios.post(`${API_URL}/oauth/token`, { provider: "figma", token: manualToken }, { headers: { Authorization: `Bearer ${token}` } });
+                    await axios.post(`${API_URL}/integrations/token`, { provider: "figma", token: manualToken }, { headers: { Authorization: `Bearer ${token}` } });
                     setMsg("Token saved!");
                     setManualToken("");
                 } catch (err) { setMsg("Failed to save token"); }
@@ -447,7 +447,7 @@
 
             const saveToken = async () => {
                 try {
-                    await axios.post(`${API_URL}/oauth/token`, { provider: "trello", token: manualToken }, { headers: { Authorization: `Bearer ${token}` } });
+                    await axios.post(`${API_URL}/integrations/token`, { provider: "trello", token: manualToken }, { headers: { Authorization: `Bearer ${token}` } });
                     setMsg("Token saved!");
                     setManualToken("");
                 } catch (err) { setMsg("Failed to save token"); }
@@ -455,14 +455,14 @@
 
             const fetchBoards = async () => {
                 try {
-                    const res = await axios.get(`${API_URL}/integrations/trello/boards`, { headers: { Authorization: `Bearer ${token}` } });
+                    const res = await axios.get(`${API_URL}/trello/boards`, { headers: { Authorization: `Bearer ${token}` } });
                     setBoards(res.data);
                 } catch (err) { setMsg("Failed to fetch boards"); }
             };
 
             const fetchLists = async (boardId) => {
                 try {
-                    const res = await axios.get(`${API_URL}/integrations/trello/boards/${boardId}/lists`, { headers: { Authorization: `Bearer ${token}` } });
+                    const res = await axios.get(`${API_URL}/trello/boards/${boardId}/lists`, { headers: { Authorization: `Bearer ${token}` } });
                     setLists(res.data);
                     setSelectedBoard(boardId);
                     if (res.data.length > 0) setSelectedListId(res.data[0].id);
@@ -472,7 +472,7 @@
             const createBoard = async (e) => {
                 e.preventDefault();
                 try {
-                    await axios.post(`${API_URL}/integrations/trello/boards`, { name: boardName }, { headers: { Authorization: `Bearer ${token}` } });
+                    await axios.post(`${API_URL}/trello/boards`, { name: boardName }, { headers: { Authorization: `Bearer ${token}` } });
                     setMsg("Board created!");
                     setBoardName("");
                     fetchBoards();
@@ -482,7 +482,7 @@
             const createCard = async (e) => {
                 e.preventDefault();
                 try {
-                    await axios.post(`${API_URL}/integrations/trello/cards`, 
+                    await axios.post(`${API_URL}/trello/cards`, 
                         { list_id: selectedListId, name: cardName }, 
                         { headers: { Authorization: `Bearer ${token}` } }
                     );

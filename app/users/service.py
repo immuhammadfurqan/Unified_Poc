@@ -1,8 +1,7 @@
 from datetime import timedelta
 from typing import Optional
-from app.repositories.user_repository import UserRepository
-from app.schemas.user import UserCreate, UserLogin
-from app.schemas.token import Token
+from app.users.repository import UserRepository
+from app.users.schemas import UserCreate, UserLogin, Token
 from app.core.security import verify_password, create_access_token
 from app.core.config import settings
 

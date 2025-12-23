@@ -1,10 +1,10 @@
 from typing import Annotated, List, Dict
 from fastapi import APIRouter, Depends, HTTPException
-from app.api.deps import get_current_user
-from app.models.user import User
-from app.services.agent_service import AgentService
-from app.services.github_service import GitHubService
-from app.api.v1.integrations import get_github_service
+from app.core.deps import get_current_user
+from app.users.models import User
+from app.agent.service import AgentService
+from app.github_integration.service import GitHubService
+from app.github_integration.router import get_github_service
 from pydantic import BaseModel
 
 router = APIRouter()

@@ -5,9 +5,9 @@ from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.core.config import settings
-from app.models.user import User
-from app.schemas.token import TokenPayload
-from app.repositories.user_repository import UserRepository
+from app.users.models import User
+from app.users.schemas import TokenPayload
+from app.users.repository import UserRepository
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login"
@@ -37,3 +37,4 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
