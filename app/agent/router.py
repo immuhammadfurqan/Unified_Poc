@@ -1,5 +1,6 @@
 from typing import Annotated, List, Dict
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from app.core.deps import get_current_user
 from app.users.models import User
 from app.agent.service import AgentService
@@ -22,10 +23,11 @@ async def chat(
     service: AgentService = Depends(get_agent_service)
 ):
     try:
-        response = await service.chat(user.id, request.messages)
-        return {"response": response}
+        return StreamingResponse(
+            service.chat_stream(user.id, request.messages),
+            media_type="application/x-ndjson"
+        )
     except Exception as e:
         # In a real app, log the error
         print(f"Agent Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

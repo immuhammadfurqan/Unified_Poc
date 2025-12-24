@@ -30,6 +30,12 @@ class GitHubService:
         owner, repo = await self._resolve_owner_repo(token, repo_name)
         return await self.client.get_file_content(token, owner, repo, path)
 
+    async def get_token(self, user_id: int) -> str:
+        """
+        Retrieves the GitHub access token for the user.
+        """
+        return await self.oauth_service.get_token(user_id, "github")
+
     async def create_file(self, user_id: int, repo_name: str, path: str, content: str, message: str) -> Dict[str, Any]:
         token = await self.oauth_service.get_token(user_id, "github")
         owner, repo = await self._resolve_owner_repo(token, repo_name)
@@ -42,4 +48,3 @@ class GitHubService:
         # Fetch current user to get owner
         user = await self.client.get_user(token)
         return user["login"], repo_name
-

@@ -46,8 +46,8 @@ api_router.include_router(agent_router, prefix="/agent", tags=["agent"])
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-# Mount static files
-app.mount("/ui", StaticFiles(directory="frontend/static", html=True), name="static")
+# Mount frontend
+app.mount("/ui", StaticFiles(directory="frontend", html=True), name="static")
 
 
 @app.get("/")
