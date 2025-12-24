@@ -23,9 +23,15 @@ async def chat(
     service: AgentService = Depends(get_agent_service)
 ):
     try:
+        headers = {
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
         return StreamingResponse(
             service.chat_stream(user.id, request.messages),
-            media_type="application/x-ndjson"
+            media_type="application/x-ndjson",
+            headers=headers,
         )
     except Exception as e:
         # In a real app, log the error

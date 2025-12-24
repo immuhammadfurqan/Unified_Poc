@@ -1,4 +1,4 @@
-window.AIChat = () => {
+﻿window.AIChat = () => {
     const [messages, setMessages] = React.useState([]);
     const [input, setInput] = React.useState("");
     const [loading, setLoading] = React.useState(false);
@@ -28,13 +28,20 @@ window.AIChat = () => {
                 tools: [] // Track tool executions
             }]);
 
+            const sanitizedMessages = newMsgs
+                .filter(msg => ['user', 'assistant', 'system'].includes(msg.role))
+                .map(msg => ({
+                    role: msg.role,
+                    content: String(msg.content ?? "")
+                }));
+
             const response = await fetch('/api/v1/agent/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${window.AuthService.getToken()}`
                 },
-                body: JSON.stringify({ messages: newMsgs })
+                body: JSON.stringify({ messages: sanitizedMessages })
             });
 
             const reader = response.body.getReader();
@@ -97,6 +104,98 @@ window.AIChat = () => {
         }
     };
 
+    const renderToolArgs = (tool) => {
+        if (!tool?.args) return null;
+        if (tool.name === 'run_terminal_command') {
+            return (
+                <div className="font-mono text-xs text-gray-500 truncate pl-5">
+                    $ {tool.args.command}
+                </div>
+            );
+        }
+        if (tool.name === 'write_sandbox_file') {
+            return (
+                <div className="font-mono text-xs text-gray-500 pl-5">
+                    {tool.args.path}
+                </div>
+            );
+        }
+        if (tool.name === 'read_sandbox_file') {
+            return (
+                <div className="font-mono text-xs text-gray-500 pl-5">
+                    {tool.args.path}
+                </div>
+            );
+        }
+        if (tool.name === 'list_sandbox_files') {
+            return (
+                <div className="font-mono text-xs text-gray-500 pl-5">
+                    {tool.args.path || '/app'}
+                </div>
+            );
+        }
+        return null;
+    };
+
+    const renderToolResult = (tool) => {
+        if (tool?.status !== 'completed') return null;
+        if (tool.result == null) return null;
+
+        if (tool.name === 'setup_dev_environment') {
+            const hostPort = tool.result.host_port;
+            return (
+                <div className="text-xs text-gray-600 pl-5">
+                    {hostPort ? `App port: http://localhost:${hostPort}` : 'App port not exposed yet'}
+                </div>
+            );
+        }
+
+        if (tool.name === 'run_terminal_command') {
+            return (
+                <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-gray-700 bg-gray-100 border border-gray-200 rounded p-2">
+                    {tool.result.output || ''}
+                </pre>
+            );
+        }
+
+        if (tool.name === 'write_sandbox_file') {
+            const content = tool.args?.content;
+            if (!content) return null;
+            return (
+                <details className="mt-2 pl-5">
+                    <summary className="text-xs text-gray-600 cursor-pointer">View file content</summary>
+                    <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-gray-700 bg-gray-100 border border-gray-200 rounded p-2">
+                        {content}
+                    </pre>
+                </details>
+            );
+        }
+
+        if (tool.name === 'read_sandbox_file') {
+            return (
+                <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-gray-700 bg-gray-100 border border-gray-200 rounded p-2">
+                    {tool.result}
+                </pre>
+            );
+        }
+
+        if (tool.name === 'list_sandbox_files') {
+            const files = Array.isArray(tool.result.files) ? tool.result.files : [];
+            return (
+                <div className="mt-2 pl-5">
+                    <div className="text-xs text-gray-600">Files: {files.length}</div>
+                    {files.length > 0 && (
+                        <pre className="mt-1 whitespace-pre-wrap font-mono text-xs text-gray-700 bg-gray-100 border border-gray-200 rounded p-2">
+                            {files.join('\n')}
+                        </pre>
+                    )}
+                </div>
+            );
+        }
+
+        return null;
+    };
+
     return (
         <div className="h-full flex flex-col bg-white rounded-lg shadow-sm border border-gray-200">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
@@ -135,17 +234,8 @@ window.AIChat = () => {
                                                 )}
                                                 <span className="font-mono text-xs font-semibold text-gray-700">{tool.name}</span>
                                             </div>
-                                            {/* Show brief args */}
-                                            {tool.name === 'run_terminal_command' && (
-                                                <div className="font-mono text-xs text-gray-500 truncate pl-5">
-                                                    $ {tool.args.command}
-                                                </div>
-                                            )}
-                                            {tool.name === 'write_sandbox_file' && (
-                                                <div className="font-mono text-xs text-gray-500 pl-5">
-                                                    📄 {tool.args.path}
-                                                </div>
-                                            )}
+                                            {renderToolArgs(tool)}
+                                            {renderToolResult(tool)}
                                         </div>
                                     ))}
                                 </div>
