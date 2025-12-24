@@ -104,7 +104,7 @@ window.AIChat = () => {
                     <i data-lucide="bot" className="w-5 h-5 text-indigo-600"></i>
                     AI Developer
                 </h2>
-                <span className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full font-medium">GPT-4o</span>
+                <span className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full font-medium">GPT-5</span>
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50" ref={scrollRef}>

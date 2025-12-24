@@ -27,6 +27,13 @@ class SandboxService:
             # Determine command based on image
             command = "tail -f /dev/null"  # Keep container running
             
+            # Create local mount directory for code visibility
+            import time
+            timestamp = int(time.time())
+            # Use absolute path for Windows/Linux compatibility
+            host_path = os.path.abspath(os.path.join(os.getcwd(), "sandbox_data", str(user_id), str(timestamp)))
+            os.makedirs(host_path, exist_ok=True)
+            
             container = self.client.containers.run(
                 image,
                 command=command,
@@ -34,7 +41,8 @@ class SandboxService:
                 # publish_all_ports=True, # We might need this later
                 ports={'3000/tcp': None}, # Expose common dev port
                 working_dir="/app",
-                labels={"user_id": str(user_id), "type": "sandbox"}
+                labels={"user_id": str(user_id), "type": "sandbox"},
+                volumes={host_path: {'bind': '/app', 'mode': 'rw'}}
             )
             
             # Reload to get network settings (ports)
@@ -53,7 +61,8 @@ class SandboxService:
                 "container_id": container.id,
                 "status": "running",
                 "host_port": host_port,
-                "image": image
+                "image": image,
+                "local_path": host_path
             }
         except Exception as e:
             logger.error(f"Failed to create sandbox: {e}")

@@ -267,7 +267,7 @@ Your goal is to build, execute, and deliver working code immediately.
 2. **USE TOOLS IMMEDIATELY**: When a user asks for a task, start calling tools in your FIRST response.
 3. **FULL IMPLEMENTATION**: Create ALL necessary files (main.py, requirements.txt, etc.) to make the app runnable.
 4. **EXECUTE & VERIFY**: Always run the code you wrote to prove it works.
-   - For web apps: Run the server in the background and tell the user the URL.
+   - For web apps: Run the server in the background binding to 0.0.0.0 (required for access) and tell the user the URL.
    - For scripts: Run the script and show the output.
 5. **GIT PERSISTENCE**: If the user mentions "push", "save", or "github", use the GitHub tools to save the work.
 
@@ -275,7 +275,7 @@ Your goal is to build, execute, and deliver working code immediately.
 1. `setup_dev_environment(image=...)`
 2. `write_sandbox_file(...)` (Repeat for all files)
 3. `run_terminal_command("pip install ...")`
-4. `run_terminal_command("python main.py", background=True)`
+4. `run_terminal_command("python main.py", background=True)` (Ensure host=0.0.0.0)
 5. Final Response: "App is running at [URL]. I have created [Files]."
 
 **Workflow for "Push to GitHub":**
@@ -288,7 +288,7 @@ Be fast, efficient, and precise. Do not chat unless asking for clarification."""
 
         # Initial API call
         response = await self.client.chat.completions.create(
-            model="gpt-4o", messages=messages, tools=self.tools, tool_choice="auto"
+            model="gpt-5", messages=messages, tools=self.tools, tool_choice="auto"
         )
 
         response_message = response.choices[0].message
@@ -318,7 +318,7 @@ Be fast, efficient, and precise. Do not chat unless asking for clarification."""
 
             # Get final response after tool execution
             second_response = await self.client.chat.completions.create(
-                model="gpt-4o", messages=messages
+                model="gpt-5", messages=messages
             )
             return second_response.choices[0].message.content
 
@@ -342,7 +342,7 @@ Your goal is to build, execute, and deliver working code immediately.
 2. **USE TOOLS IMMEDIATELY**: When a user asks for a task, start calling tools in your FIRST response.
 3. **FULL IMPLEMENTATION**: Create ALL necessary files (main.py, requirements.txt, etc.) to make the app runnable.
 4. **EXECUTE & VERIFY**: Always run the code you wrote to prove it works.
-   - For web apps: Run the server in the background and tell the user the URL.
+   - For web apps: Run the server in the background binding to 0.0.0.0 (required for access) and tell the user the URL.
    - For scripts: Run the script and show the output.
 5. **GIT PERSISTENCE**: If the user mentions "push", "save", or "github", use the GitHub tools to save the work.
 
@@ -350,7 +350,7 @@ Your goal is to build, execute, and deliver working code immediately.
 1. `setup_dev_environment(image=...)`
 2. `write_sandbox_file(...)` (Repeat for all files)
 3. `run_terminal_command("pip install ...")`
-4. `run_terminal_command("python main.py", background=True)`
+4. `run_terminal_command("python main.py", background=True)` (Ensure host=0.0.0.0)
 5. Final Response: "App is running at [URL]. I have created [Files]."
 
 **Workflow for "Push to GitHub":**
@@ -363,7 +363,7 @@ Be fast, efficient, and precise. Do not chat unless asking for clarification."""
 
         # Initial API call with stream=True
         response = await self.client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5",
             messages=messages,
             tools=self.tools,
             tool_choice="auto",
@@ -456,7 +456,7 @@ Be fast, efficient, and precise. Do not chat unless asking for clarification."""
 
             # Get final response after tool execution (streaming)
             second_response = await self.client.chat.completions.create(
-                model="gpt-4o", messages=messages, stream=True
+                model="gpt-5", messages=messages, stream=True
             )
 
             async for chunk in second_response:
