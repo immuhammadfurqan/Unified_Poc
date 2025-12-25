@@ -35,14 +35,14 @@ async def startup_event():
 
 # Construct API Router
 api_router = APIRouter()
-api_router.include_router(users_router, prefix="/auth", tags=["auth"])
+api_router.include_router(users_router, prefix="/auth", tags=["Auth"])
 api_router.include_router(
-    integrations_router, prefix="/integrations", tags=["integrations"]
+    integrations_router, prefix="/integrations", tags=["Integrations"]
 )
-api_router.include_router(github_router, prefix="/github", tags=["github"])
-api_router.include_router(trello_router, prefix="/trello", tags=["trello"])
-api_router.include_router(figma_router, prefix="/figma", tags=["figma"])
-api_router.include_router(agent_router, prefix="/agent", tags=["agent"])
+api_router.include_router(github_router, prefix="/github", tags=["GitHub"])
+api_router.include_router(trello_router, prefix="/trello", tags=["Trello"])
+api_router.include_router(figma_router, prefix="/figma", tags=["Figma"])
+api_router.include_router(agent_router, prefix="/agent", tags=["Agent"])
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
@@ -56,4 +56,15 @@ async def root():
 
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True, reload_dirs=["app"])
+    import sys
+    # Use reload only if --reload flag is passed or running interactively
+    use_reload = "--reload" in sys.argv or sys.stdin.isatty()
+    
+    uvicorn.run(
+        "app.main:app", 
+        host="127.0.0.1", 
+        port=8000, 
+        reload=use_reload, 
+        reload_dirs=["app", "frontend"] if use_reload else None,
+        reload_excludes=["sandbox_data", "venv", "*.pyc", "__pycache__"] if use_reload else None
+    )

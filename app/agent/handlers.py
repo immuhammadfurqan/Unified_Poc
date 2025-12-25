@@ -82,6 +82,35 @@ class SandboxToolHandler:
         self._sandbox_service = sandbox_service
         self._github_handler = github_handler
         self._active_containers: Dict[int, str] = {}
+    
+    def restore_active_container(self, user_id: int) -> Dict[str, Any] | None:
+        """
+        Restores the active container for a user by querying Docker.
+        Returns sandbox info if found, None otherwise.
+        """
+        sandboxes = self._sandbox_service.list_sandboxes(user_id)
+        if sandboxes:
+            # Use the most recently created sandbox
+            latest = max(sandboxes, key=lambda s: s.get("created_at", "0"))
+            self._active_containers[user_id] = latest["container_id"]
+            return latest
+        return None
+    
+    def get_active_sandbox_info(self, user_id: int) -> Dict[str, Any] | None:
+        """Gets info about the active sandbox for context injection."""
+        # First check if we have a cached container
+        container_id = self._active_containers.get(user_id)
+        if container_id:
+            # Verify it still exists
+            sandboxes = self._sandbox_service.list_sandboxes(user_id)
+            for s in sandboxes:
+                if s["container_id"] == container_id:
+                    return s
+            # Container no longer exists, clear cache
+            del self._active_containers[user_id]
+        
+        # Try to restore from Docker
+        return self.restore_active_container(user_id)
 
     def get_active_container_id(self, user_id: int) -> str | None:
         """Returns the last active container id for a user, if any."""

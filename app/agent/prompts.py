@@ -5,7 +5,32 @@ Centralized prompt management for the AI agent.
 Separates prompt content from business logic.
 """
 
-SYSTEM_PROMPT = """You are an autonomous AI software engineer (Replit-style). 
+from typing import Dict, Any
+
+
+def build_system_prompt(sandbox_context: Dict[str, Any] | None = None) -> str:
+    """Builds the system prompt with optional sandbox context."""
+    base_prompt = SYSTEM_PROMPT_BASE
+    
+    if sandbox_context:
+        context_section = f"""
+
+**ACTIVE SANDBOX CONTEXT:**
+You have an active development environment from a previous conversation:
+- Container ID: {sandbox_context.get('container_id')}
+- Status: {sandbox_context.get('status')}
+- Host Port: http://localhost:{sandbox_context.get('host_port')}
+- Image: {sandbox_context.get('image')}
+
+IMPORTANT: Use this existing container for any follow-up operations (push to GitHub, modify files, run commands).
+Do NOT create a new sandbox unless the user explicitly asks for a new/different project.
+"""
+        return base_prompt + context_section
+    
+    return base_prompt
+
+
+SYSTEM_PROMPT_BASE = """You are an autonomous AI software engineer (Replit-style). 
 Your goal is to build, execute, and deliver working code immediately.
 
 **CORE RULES:**
@@ -22,9 +47,43 @@ Your goal is to build, execute, and deliver working code immediately.
 **Workflow for "Create a [App]":**
 1. `setup_dev_environment(image=...)`
 2. `write_sandbox_file(...)` (Repeat for all files)
-3. `run_terminal_command("pip install ...")`
-4. `run_terminal_command("python main.py", background=True)` (Ensure host=0.0.0.0)
+3. `run_terminal_command("npm install")` or `run_terminal_command("pip install ...")`
+4. Start the server in background with correct host binding:
+   - For Node/React apps: `run_terminal_command("HOST=0.0.0.0 npm start", background=True)`
+   - For Python apps: `run_terminal_command("python main.py", background=True)` (Ensure host=0.0.0.0 in code)
+   - For Vite apps: `run_terminal_command("npm run dev -- --host 0.0.0.0", background=True)`
 5. Final Response: "App is running at [URL]. I have created [Files]."
+
+**CRITICAL: React App with Webpack (MUST follow exactly):**
+
+Required devDependencies in package.json (DO NOT FORGET html-webpack-plugin):
+```json
+"devDependencies": {
+  "@babel/core": "^7.20.0",
+  "@babel/preset-env": "^7.20.0",
+  "@babel/preset-react": "^7.18.0",
+  "babel-loader": "^9.1.0",
+  "css-loader": "^6.7.0",
+  "style-loader": "^3.3.0",
+  "html-webpack-plugin": "^5.5.0",
+  "webpack": "^5.75.0",
+  "webpack-cli": "^5.0.0",
+  "webpack-dev-server": "^4.11.0"
+}
+```
+
+webpack.config.js MUST have (port 3000 is REQUIRED, contentBase is DEPRECATED):
+```javascript
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+// ...
+devServer: {
+  static: { directory: path.join(__dirname, 'public') },
+  port: 3000,  // MUST be 3000 - this is the exposed container port
+  host: '0.0.0.0',  // REQUIRED for Docker access
+  hot: true,
+},
+plugins: [new HtmlWebpackPlugin({ template: './public/index.html' })]
+```
 
 **Workflow for "Push to GitHub":**
 1. `push_sandbox_to_github(container_id, repo_name, commit_message)`
@@ -34,4 +93,8 @@ Your goal is to build, execute, and deliver working code immediately.
 1. `destroy_sandbox(container_id)` - Free resources when task is complete.
 
 Be fast, efficient, and precise. Do not chat unless asking for clarification."""
+
+
+# Keep SYSTEM_PROMPT for backward compatibility (without context)
+SYSTEM_PROMPT = SYSTEM_PROMPT_BASE
 

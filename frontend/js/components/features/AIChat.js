@@ -2,6 +2,8 @@
     const [messages, setMessages] = React.useState([]);
     const [input, setInput] = React.useState("");
     const [loading, setLoading] = React.useState(false);
+    const [activeAppPort, setActiveAppPort] = React.useState(null);
+    const [appReady, setAppReady] = React.useState(false);
     const scrollRef = React.useRef(null);
 
     React.useEffect(() => {
@@ -85,6 +87,23 @@
                                     tools[toolIdx] = { ...tools[toolIdx], status: 'completed', result: event.result };
                                 }
                                 msg.tools = tools;
+                                
+                                // Track active app port from setup_dev_environment
+                                if (event.name === 'setup_dev_environment' && event.result?.host_port) {
+                                    setActiveAppPort(event.result.host_port);
+                                    setAppReady(false);
+                                }
+                                
+                                // Mark app as ready when npm start/dev runs in background
+                                if (event.name === 'run_terminal_command') {
+                                    const cmd = tools[toolIdx]?.args?.command || '';
+                                    const isStartCmd = cmd.includes('npm start') || cmd.includes('npm run dev') || cmd.includes('npm run start');
+                                    const isBackground = tools[toolIdx]?.args?.background || event.result?.output?.includes('background');
+                                    if (isStartCmd) {
+                                        // Give the server a moment to start, then show preview
+                                        setTimeout(() => setAppReady(true), 2000);
+                                    }
+                                }
                             }
                             
                             currentMsgs[msgIndex] = msg;
@@ -143,9 +162,18 @@
 
         if (tool.name === 'setup_dev_environment') {
             const hostPort = tool.result.host_port;
+            if (!hostPort) {
+                return (
+                    <div className="text-xs text-gray-600 pl-5">
+                        App port not exposed yet
+                    </div>
+                );
+            }
+            const appUrl = `http://localhost:${hostPort}`;
             return (
                 <div className="text-xs text-gray-600 pl-5">
-                    {hostPort ? `App port: http://localhost:${hostPort}` : 'App port not exposed yet'}
+                    App port: <a href={appUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline">{appUrl}</a>
+                    <span className="ml-2 text-gray-400">(preview will appear after server starts)</span>
                 </div>
             );
         }
@@ -254,6 +282,54 @@
                         <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
                             <i data-lucide="loader" className="w-5 h-5 animate-spin text-indigo-600"></i>
                         </div>
+                    </div>
+                )}
+                
+                {/* Live Preview Panel */}
+                {activeAppPort && appReady && (
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-white">
+                                <i data-lucide="monitor" className="w-4 h-4"></i>
+                                <span className="font-medium text-sm">Live Preview</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <a 
+                                    href={`http://localhost:${activeAppPort}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-white/80 hover:text-white text-xs flex items-center gap-1"
+                                >
+                                    <i data-lucide="external-link" className="w-3 h-3"></i>
+                                    Open in new tab
+                                </a>
+                                <button
+                                    onClick={() => {
+                                        const iframe = document.getElementById('live-preview-iframe');
+                                        if (iframe) iframe.src = iframe.src;
+                                    }}
+                                    className="text-white/80 hover:text-white p-1"
+                                    title="Refresh preview"
+                                >
+                                    <i data-lucide="refresh-cw" className="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="bg-gray-100 px-3 py-1.5 border-b border-gray-200 flex items-center gap-2">
+                            <div className="flex gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-red-400"></span>
+                                <span className="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
+                                <span className="w-2.5 h-2.5 rounded-full bg-green-400"></span>
+                            </div>
+                            <span className="text-xs text-gray-500 font-mono ml-2">http://localhost:{activeAppPort}</span>
+                        </div>
+                        <iframe 
+                            id="live-preview-iframe"
+                            src={`http://localhost:${activeAppPort}`}
+                            className="w-full h-96 bg-white"
+                            title="App Preview"
+                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                        />
                     </div>
                 )}
             </div>

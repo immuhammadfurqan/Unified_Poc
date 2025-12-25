@@ -20,7 +20,7 @@ from app.github_integration.service import GitHubService
 from app.sandbox.service import SandboxService
 from app.core.config import settings
 from app.agent.constants import DEFAULT_MODEL
-from app.agent.prompts import SYSTEM_PROMPT
+from app.agent.prompts import build_system_prompt
 from app.agent.tools import get_all_tools
 from app.agent.handlers import GitHubToolHandler, SandboxToolHandler, ToolExecutor
 
@@ -38,14 +38,14 @@ class AgentService:
     def __init__(self, github_service: GitHubService):
         self._client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self._tools = get_all_tools()
-        self._tool_executor = self._create_tool_executor(github_service)
+        self._tool_executor, self._sandbox_handler = self._create_tool_executor(github_service)
 
-    def _create_tool_executor(self, github_service: GitHubService) -> ToolExecutor:
+    def _create_tool_executor(self, github_service: GitHubService) -> tuple[ToolExecutor, SandboxToolHandler]:
         """Factory method to create the tool executor with its dependencies."""
         sandbox_service = SandboxService()
         github_handler = GitHubToolHandler(github_service)
         sandbox_handler = SandboxToolHandler(sandbox_service, github_handler)
-        return ToolExecutor(github_handler, sandbox_handler)
+        return ToolExecutor(github_handler, sandbox_handler), sandbox_handler
 
     async def chat(self, user_id: int, messages: List[Dict[str, str]]) -> str:
         """
@@ -58,7 +58,7 @@ class AgentService:
         Returns:
             The assistant's response as a string
         """
-        self._ensure_system_message(messages)
+        self._ensure_system_message(user_id, messages)
         
         response = await self._call_openai(messages)
         response_message = response.choices[0].message
@@ -79,7 +79,7 @@ class AgentService:
         Yields:
             JSON-formatted strings containing content or tool execution updates
         """
-        self._ensure_system_message(messages)
+        self._ensure_system_message(user_id, messages)
         while True:
             tool_calls = []
             async for chunk in await self._call_openai_stream(messages):
@@ -105,10 +105,17 @@ class AgentService:
                 async for chunk in self._execute_and_yield_tool_result(user_id, tool_call, messages):
                     yield chunk
 
-    def _ensure_system_message(self, messages: List[Dict[str, str]]) -> None:
-        """Ensures the conversation has a system message."""
+    def _ensure_system_message(self, user_id: int, messages: List[Dict[str, str]]) -> None:
+        """Ensures the conversation has a system message with sandbox context."""
+        # Get active sandbox context for this user
+        sandbox_context = self._sandbox_handler.get_active_sandbox_info(user_id)
+        system_prompt = build_system_prompt(sandbox_context)
+        
         if not messages or messages[0].get("role") != "system":
-            messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
+            messages.insert(0, {"role": "system", "content": system_prompt})
+        else:
+            # Update existing system message with fresh context
+            messages[0]["content"] = system_prompt
 
     async def _call_openai(self, messages: List[Dict], include_tools: bool = True):
         """Makes a non-streaming call to OpenAI API."""
