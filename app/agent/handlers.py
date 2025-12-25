@@ -82,6 +82,20 @@ class SandboxToolHandler:
         self._sandbox_service = sandbox_service
         self._github_handler = github_handler
         self._active_containers: Dict[int, str] = {}
+
+    def get_active_container_id(self, user_id: int) -> str | None:
+        """Returns the last active container id for a user, if any."""
+        return self._active_containers.get(user_id)
+
+    def _ensure_container_id(self, user_id: int, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Injects a container_id from the active container if missing."""
+        if not args.get("container_id"):
+            container_id = self.get_active_container_id(user_id)
+            if not container_id:
+                raise ValueError("No active sandbox. Run setup_dev_environment first.")
+            args = dict(args)
+            args["container_id"] = container_id
+        return args
     
     async def setup_dev_environment(self, user_id: int, args: Dict[str, Any]) -> Dict[str, Any]:
         result = self._sandbox_service.create_sandbox(user_id, args["image"])
@@ -92,33 +106,39 @@ class SandboxToolHandler:
         
         return result
     
-    def run_command(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def run_command(self, user_id: int, args: Dict[str, Any]) -> Dict[str, Any]:
+        args = self._ensure_container_id(user_id, args)
         return self._sandbox_service.execute_command(
             args["container_id"],
             args["command"],
             background=args.get("background", False),
         )
     
-    def write_file(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def write_file(self, user_id: int, args: Dict[str, Any]) -> Dict[str, Any]:
+        args = self._ensure_container_id(user_id, args)
         return self._sandbox_service.write_file(
             args["container_id"], args["path"], args["content"]
         )
     
-    def read_file(self, args: Dict[str, Any]) -> str:
+    def read_file(self, user_id: int, args: Dict[str, Any]) -> str:
+        args = self._ensure_container_id(user_id, args)
         return self._sandbox_service.read_file(args["container_id"], args["path"])
     
-    def list_files(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def list_files(self, user_id: int, args: Dict[str, Any]) -> Dict[str, Any]:
+        args = self._ensure_container_id(user_id, args)
         return self._sandbox_service.list_files(
             args["container_id"], args.get("path", DEFAULT_WORKING_DIR)
         )
     
-    def destroy_sandbox(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def destroy_sandbox(self, user_id: int, args: Dict[str, Any]) -> Dict[str, Any]:
+        args = self._ensure_container_id(user_id, args)
         container_id = args["container_id"]
         result = self._sandbox_service.destroy_sandbox(container_id)
         self._remove_from_active_containers(container_id)
         return result
     
     async def push_to_github(self, user_id: int, args: Dict[str, Any]) -> Dict[str, Any]:
+        args = self._ensure_container_id(user_id, args)
         container_id = args["container_id"]
         repo_name = args["repo_name"]
         commit_message = args.get("commit_message", DEFAULT_COMMIT_MESSAGE)
@@ -266,19 +286,19 @@ class ToolExecutor:
         return await self._sandbox_handler.setup_dev_environment(user_id, args)
     
     async def _handle_run_command(self, _user_id: int, args: Dict) -> Any:
-        return self._sandbox_handler.run_command(args)
+        return self._sandbox_handler.run_command(_user_id, args)
     
     async def _handle_write_file(self, _user_id: int, args: Dict) -> Any:
-        return self._sandbox_handler.write_file(args)
+        return self._sandbox_handler.write_file(_user_id, args)
     
     async def _handle_read_file(self, _user_id: int, args: Dict) -> Any:
-        return self._sandbox_handler.read_file(args)
+        return self._sandbox_handler.read_file(_user_id, args)
     
     async def _handle_list_files(self, _user_id: int, args: Dict) -> Any:
-        return self._sandbox_handler.list_files(args)
+        return self._sandbox_handler.list_files(_user_id, args)
     
     async def _handle_destroy_sandbox(self, _user_id: int, args: Dict) -> Any:
-        return self._sandbox_handler.destroy_sandbox(args)
+        return self._sandbox_handler.destroy_sandbox(_user_id, args)
     
     async def _handle_push_to_github(self, user_id: int, args: Dict) -> Any:
         return await self._sandbox_handler.push_to_github(user_id, args)
